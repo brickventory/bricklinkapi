@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	itemTypes = [9]string{"MINIFIG", "PART", "SET", "BOOK", "GEAR", "CATALOG", "INSTRUCTION", "UNSORTED_LOT", "ORIGINAL_BOX"}
+	itemTypes = []string{"MINIFIG", "PART", "SET", "BOOK", "GEAR", "CATALOG", "INSTRUCTION", "UNSORTED_LOT", "ORIGINAL_BOX"}
 )
 
 // Bricklink is the main handler for the Bricklink API requests
@@ -45,8 +45,8 @@ func New(consumerKey, consumerSecret, token, tokenSecret string) *Bricklink {
 // GetItem issues a GET request to the Bricklink API
 func (bl *Bricklink) GetItem(itemType, itemNumber string) (response string, err error) {
 	// set default itemtype to "part"
-	if itemType == "" {
-		itemType = "part"
+	if itemType == "" || !stringInSlice(itemType, itemTypes) {
+		return response, errors.New("itemType is not specified or valid")
 	}
 
 	// validate itemNumber
@@ -94,8 +94,8 @@ func (bl Bricklink) request(method, uri string) (body []byte, err error) {
 	params.Add("oauth_version", oauthVersion)
 
 	// generate signature
-	baseURL := bl.generateBaseURL(req, params)
-	signature := bl.generateSignature(baseURL)
+	baseURL := generateBaseURL(req, params)
+	signature := generateSignature(baseURL, bl.ConsumerSecret, bl.TokenSecret)
 	params.Add("oauth_signature", signature)
 
 	// set header
@@ -129,7 +129,7 @@ func (bl Bricklink) request(method, uri string) (body []byte, err error) {
 }
 
 // generateBaseURL generates the base URL for the signature
-func (bl Bricklink) generateBaseURL(req *http.Request, params url.Values) string {
+func generateBaseURL(req *http.Request, params url.Values) string {
 	base := req.Method + "&"
 	base += encode(req.URL.String()) + "&"
 	base += encode(params.Encode())
@@ -137,10 +137,11 @@ func (bl Bricklink) generateBaseURL(req *http.Request, params url.Values) string
 	return base
 }
 
-// generateSignature generates the OAuth signature for the request
-func (bl Bricklink) generateSignature(base string) string {
+// generateSignature generates the OAuth signature for the request.
+// It receives the base string, the consumer secret and the token secret
+func generateSignature(base, cs, ts string) string {
 	// construct the key
-	key := encode(bl.ConsumerSecret) + "&" + encode(bl.TokenSecret)
+	key := encode(cs) + "&" + encode(ts)
 
 	// encrypt with HMAC-SHA1
 	h := hmac.New(sha1.New, []byte(key))
@@ -178,4 +179,14 @@ func encode(s string) string {
 func encodable(b byte) bool {
 	return !('A' <= b && b <= 'Z' || 'a' <= b && b <= 'z' ||
 		'0' <= b && b <= '9' || b == '-' || b == '.' || b == '_' || b == '~')
+}
+
+// helper function to check if a string is in a slice
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
