@@ -22,7 +22,6 @@ func main() {
 		Token:          os.Getenv("TOKEN_VALUE"),
 		TokenSecret:    os.Getenv("TOKEN_SECRET"),
 	}
-	// fmt.Println(bl)
 
-	fmt.Println(bl.GetItem())
+	fmt.Println(bl.GetItem("part", "3004"))
 }

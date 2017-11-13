@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -19,7 +20,11 @@ const (
 	oauthSignatureMethod = "HMAC-SHA1"
 )
 
-// Bricklink is the main Handler for the Bricklink API requests
+var (
+	itemTypes = [9]string{"MINIFIG", "PART", "SET", "BOOK", "GEAR", "CATALOG", "INSTRUCTION", "UNSORTED_LOT", "ORIGINAL_BOX"}
+)
+
+// Bricklink is the main handler for the Bricklink API requests
 type Bricklink struct {
 	ConsumerKey    string
 	ConsumerSecret string
@@ -27,7 +32,7 @@ type Bricklink struct {
 	TokenSecret    string
 }
 
-// New returns a Bricklink Handler ready to use
+// New returns a Bricklink handler ready to use
 func New(consumerKey, consumerSecret, token, tokenSecret string) *Bricklink {
 	return &Bricklink{
 		ConsumerKey:    consumerKey,
@@ -38,18 +43,30 @@ func New(consumerKey, consumerSecret, token, tokenSecret string) *Bricklink {
 }
 
 // GetItem issues a GET request to the Bricklink API
-func (bl *Bricklink) GetItem() string {
+func (bl *Bricklink) GetItem(itemType, itemNumber string) (response string, err error) {
+	// set default itemtype to "part"
+	if itemType == "" {
+		itemType = "part"
+	}
+
+	// validate itemNumber
+	if itemNumber == "" {
+		return response, errors.New("itemNumber is not specified")
+	}
 	// build uri
-	uri := "/items/part/3001"
+	uri := "/items/" + itemType + "/" + itemNumber
 
 	body, err := bl.request("GET", uri)
 	if err != nil {
-		fmt.Printf("%#v\n", err)
+		return response, err
 	}
 
-	return string(body)
+	return string(body), nil
 }
 
+// request() handles the request process. It builds of the oauth header,
+// sets the request parameters and issues the request.
+// The response body is returned as a []byte slice.
 func (bl Bricklink) request(method, uri string) (body []byte, err error) {
 	// new client
 	client := http.Client{
