@@ -2,7 +2,7 @@ package bricklinkapi
 
 import (
 	"errors"
-	// "fmt"
+	"fmt"
 	"strings"
 )
 
@@ -46,7 +46,7 @@ func New(consumerKey, consumerSecret, token, tokenSecret string) *Bricklink {
 // GetItem issues a GET request to the Bricklink API and querys for the specified item
 func (bl Bricklink) GetItem(itemType, itemNumber string) (response string, err error) {
 	// validate itemType
-	err = validateItemType(itemType)
+	err = validateParam(itemType, itemTypes)
 	if err != nil {
 		return response, err
 	}
@@ -70,7 +70,7 @@ func (bl Bricklink) GetItem(itemType, itemNumber string) (response string, err e
 // GetItemPrice retrieves the price of an item
 func (bl Bricklink) GetItemPrice(itemType, itemNumber string, params map[string]string) (response string, err error) {
 	// validate itemType
-	err = validateItemType(itemType)
+	err = validateParam(itemType, itemTypes)
 	if err != nil {
 		return response, err
 	}
@@ -103,14 +103,16 @@ func (bl Bricklink) GetItemPrice(itemType, itemNumber string, params map[string]
 	return string(body), nil
 }
 
-// helper function to validate the allowed item type
-func validateItemType(it string) (err error) {
-	if it == "" {
-		return errors.New("itemType is not specified")
+// helper function to validate a param
+func validateParam(param string, list []string) (err error) {
+	// parameter must be set
+	if param == "" {
+		return fmt.Errorf("param \"%v\" is not specified", param)
 	}
 
-	if !stringInSlice(it, itemTypes) {
-		return errors.New("itemType is not valid")
+	// param must be valid
+	if !stringInSlice(param, list) {
+		return fmt.Errorf("param \"%v\" is not valid", param)
 	}
 
 	return nil

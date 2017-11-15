@@ -21,7 +21,7 @@ func main() {
     bl := bricklinkapi.New(CONSUMER_KEY, CONSUMER_SECRET, TOKEN_VALUE, TOKEN_SECRET)
 
     // try some simple query
-    // query for part #3004, which is the basic 1x4 brick
-    fmt.Println(bl.GetItem("part", "3004"))
+    // query for part #3004, which is the basic 2x4 brick
+    fmt.Println(bl.GetItem("part", "3001"))
 }
 ```
