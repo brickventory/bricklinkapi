@@ -3,6 +3,7 @@ package bricklinkapi
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -43,7 +44,7 @@ func New(consumerKey, consumerSecret, token, tokenSecret string) *Bricklink {
 	return bl
 }
 
-// GetItem issues a GET request to the Bricklink API and querys for the specified item
+// GetItem issues a GET request to the Bricklink API and querys for the specified item.
 func (bl Bricklink) GetItem(itemType, itemNumber string) (response string, err error) {
 	// validate itemType
 	err = validateParam(itemType, itemTypes)
@@ -67,7 +68,31 @@ func (bl Bricklink) GetItem(itemType, itemNumber string) (response string, err e
 	return string(body), nil
 }
 
-// GetItemPrice retrieves the price of an item
+// GetItemImage issues a GET request to the Bricklink API and querys for the specified item image.
+func (bl Bricklink) GetItemImage(itemType, itemNumber string, colorID int) (response string, err error) {
+	// validate itemType
+	err = validateParam(itemType, itemTypes)
+	if err != nil {
+		return response, err
+	}
+
+	// validate itemNumber
+	if itemNumber == "" {
+		return response, errors.New("itemNumber is not specified")
+	}
+
+	// build uri
+	uri := "/items/" + itemType + "/" + itemNumber + "/images/" + strconv.Itoa(colorID)
+
+	body, err := bl.request.Request("GET", uri)
+	if err != nil {
+		return response, err
+	}
+
+	return string(body), nil
+}
+
+// GetItemPrice issues a GET request to the Bricklink API and querys for the price of an item.
 func (bl Bricklink) GetItemPrice(itemType, itemNumber string, params map[string]string) (response string, err error) {
 	// validate itemType
 	err = validateParam(itemType, itemTypes)
@@ -103,11 +128,63 @@ func (bl Bricklink) GetItemPrice(itemType, itemNumber string, params map[string]
 	return string(body), nil
 }
 
+// GetColorList issues a GET request to the Bricklink API and querys for a list of all colors.
+func (bl Bricklink) GetColorList() (response string, err error) {
+	// build uri
+	uri := "/colors"
+
+	body, err := bl.request.Request("GET", uri)
+	if err != nil {
+		return response, err
+	}
+
+	return string(body), nil
+}
+
+// GetColor issues a GET request to the Bricklink API and querys for the specified color.
+func (bl Bricklink) GetColor(colorID int) (response string, err error) {
+	// build uri
+	uri := "/colors/" + strconv.Itoa(colorID)
+
+	body, err := bl.request.Request("GET", uri)
+	if err != nil {
+		return response, err
+	}
+
+	return string(body), nil
+}
+
+// GetCategoryList issues a GET request to the Bricklink API and querys for a list of all categories.
+func (bl Bricklink) GetCategoryList() (response string, err error) {
+	// build uri
+	uri := "/categories"
+
+	body, err := bl.request.Request("GET", uri)
+	if err != nil {
+		return response, err
+	}
+
+	return string(body), nil
+}
+
+// GetCategory issues a GET request to the Bricklink API and querys for a specified category.
+func (bl Bricklink) GetCategory(categoryID int) (response string, err error) {
+	// build uri
+	uri := "/categories/" + strconv.Itoa(categoryID)
+
+	body, err := bl.request.Request("GET", uri)
+	if err != nil {
+		return response, err
+	}
+
+	return string(body), nil
+}
+
 // helper function to validate a param
 func validateParam(param string, list []string) (err error) {
 	// parameter must be set
 	if param == "" {
-		return fmt.Errorf("param \"%v\" is not specified", param)
+		return errors.New("param is empty")
 	}
 
 	// param must be valid
