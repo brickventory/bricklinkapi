@@ -4,73 +4,35 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
-const (
-	brickLinkAPIBaseURL  = "https://api.bricklink.com/api/store/v1"
-	oauthVersion         = "1.0"
-	oauthSignatureMethod = "HMAC-SHA1"
-)
-
-var (
-	itemTypes = []string{"MINIFIG", "PART", "SET", "BOOK", "GEAR", "CATALOG", "INSTRUCTION", "UNSORTED_LOT", "ORIGINAL_BOX"}
-)
-
-// Bricklink is the main handler for the Bricklink API requests
-type Bricklink struct {
-	ConsumerKey    string
-	ConsumerSecret string
-	Token          string
-	TokenSecret    string
+// RequestHandler defines the request interface
+type RequestHandler interface {
+	Request(method, uri string) (body []byte, err error)
 }
 
-// New returns a Bricklink handler ready to use
-func New(consumerKey, consumerSecret, token, tokenSecret string) *Bricklink {
-	return &Bricklink{
-		ConsumerKey:    consumerKey,
-		ConsumerSecret: consumerSecret,
-		Token:          token,
-		TokenSecret:    tokenSecret,
-	}
-}
-
-// GetItem issues a GET request to the Bricklink API
-func (bl *Bricklink) GetItem(itemType, itemNumber string) (response string, err error) {
-	// set default itemtype to "part"
-	if itemType == "" || !stringInSlice(itemType, itemTypes) {
-		return response, errors.New("itemType is not specified or valid")
-	}
-
-	// validate itemNumber
-	if itemNumber == "" {
-		return response, errors.New("itemNumber is not specified")
-	}
-	// build uri
-	uri := "/items/" + itemType + "/" + itemNumber
-
-	body, err := bl.request("GET", uri)
-	if err != nil {
-		return response, err
-	}
-
-	return string(body), nil
+type request struct {
+	consumerKey    string
+	consumerSecret string
+	token          string
+	tokenSecret    string
 }
 
 // request() handles the request process. It builds of the oauth header,
 // sets the request parameters and issues the request.
 // The response body is returned as a []byte slice.
-func (bl Bricklink) request(method, uri string) (body []byte, err error) {
+func (r request) Request(method, uri string) (body []byte, err error) {
 	// new client
 	client := http.Client{
-		Timeout: time.Second * 5, // Maximum of 5 secs
+		Timeout: time.Second * 30, // Maximum of 5 secs
 	}
 
 	// build new request
@@ -84,27 +46,35 @@ func (bl Bricklink) request(method, uri string) (body []byte, err error) {
 	timestamp := strconv.FormatInt(timeUnix, 10)
 	nonce := strconv.FormatInt(rand.New(rand.NewSource(timeUnix)).Int63(), 10)
 
-	// construct values for request
-	params := url.Values{}
-	params.Add("oauth_consumer_key", bl.ConsumerKey)
-	params.Add("oauth_token", bl.Token)
-	params.Add("oauth_signature_method", oauthSignatureMethod)
-	params.Add("oauth_timestamp", timestamp)
-	params.Add("oauth_nonce", nonce)
-	params.Add("oauth_version", oauthVersion)
+	// construct values for oauth params
+	var oauthParams []string
+	oauthParams = append(oauthParams, "oauth_consumer_key="+r.consumerKey)
+	oauthParams = append(oauthParams, "oauth_token="+r.token)
+	oauthParams = append(oauthParams, "oauth_signature_method="+oauthSignatureMethod)
+	oauthParams = append(oauthParams, "oauth_timestamp="+timestamp)
+	oauthParams = append(oauthParams, "oauth_nonce="+nonce)
+	oauthParams = append(oauthParams, "oauth_version="+oauthVersion)
+
+	// extract uri params from URI and add to oauth params map
+	uriSplit := strings.Split(req.URL.String(), "?")
+	if len(uriSplit) > 1 {
+		uriParamString := strings.Split(uriSplit[1], "&")
+		for _, s := range uriParamString {
+			oauthParams = append(oauthParams, s)
+		}
+	}
 
 	// generate signature
-	baseURL := generateBaseURL(req, params)
-	signature := generateSignature(baseURL, bl.ConsumerSecret, bl.TokenSecret)
-	params.Add("oauth_signature", signature)
+	baseURL := generateBaseURL(req, oauthParams)
+	signature := generateSignature(baseURL, r.consumerSecret, r.tokenSecret)
 
 	// set header
 	req.Header.Set("User-Agent", "bricklinkapi-test")
 
-	// build authorization string
+	// build authorization string for the header
 	authorization := "OAuth "
-	authorization += "oauth_consumer_key=\"" + bl.ConsumerKey + "\","
-	authorization += "oauth_token=\"" + bl.Token + "\","
+	authorization += "oauth_consumer_key=\"" + r.consumerKey + "\","
+	authorization += "oauth_token=\"" + r.token + "\","
 	authorization += "oauth_signature_method=\"" + oauthSignatureMethod + "\","
 	authorization += "oauth_signature=\"" + signature + "\","
 	authorization += "oauth_timestamp=\"" + timestamp + "\","
@@ -129,10 +99,19 @@ func (bl Bricklink) request(method, uri string) (body []byte, err error) {
 }
 
 // generateBaseURL generates the base URL for the signature
-func generateBaseURL(req *http.Request, params url.Values) string {
+func generateBaseURL(req *http.Request, params []string) string {
 	base := req.Method + "&"
-	base += encode(req.URL.String()) + "&"
-	base += encode(params.Encode())
+	base += encode(strings.Split(req.URL.String(), "?")[0])
+
+	// sort params
+	sort.Strings(params)
+
+	paramString := strings.Join(params, "&")
+	encodedParamString := encode(paramString)
+
+	if len(encodedParamString) != 0 {
+		base += "&" + encodedParamString
+	}
 
 	return base
 }
@@ -179,14 +158,4 @@ func encode(s string) string {
 func encodable(b byte) bool {
 	return !('A' <= b && b <= 'Z' || 'a' <= b && b <= 'z' ||
 		'0' <= b && b <= '9' || b == '-' || b == '.' || b == '_' || b == '~')
-}
-
-// helper function to check if a string is in a slice
-func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }
