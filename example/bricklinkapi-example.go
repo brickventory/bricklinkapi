@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dirkolbrich/bricklinkapi"
+	"github.com/brickventory/bricklinkapi"
 	"github.com/joho/godotenv"
 )
 
