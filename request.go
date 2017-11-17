@@ -42,7 +42,7 @@ func (r request) Request(method, uri string) (body []byte, err error) {
 	}
 
 	// construct timestamp and nonce used in the oauth
-	timeUnix := time.Now().Unix()
+	timeUnix := time.Now().UnixNano()
 	timestamp := strconv.FormatInt(timeUnix, 10)
 	nonce := strconv.FormatInt(rand.New(rand.NewSource(timeUnix)).Int63(), 10)
 
